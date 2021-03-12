@@ -8,11 +8,25 @@
 import RPi.GPIO as GPIO
 import time
 
-ledpin = 11
+servoPin = 11
 trigPin = 16
 echoPin = 18
+OFFSE_DUTY = 0.5                     # define pulse offset of servo
+SERVO_MIN_DUTY = 2.5 + OFFSE_DUTY      # define pulse duty cycle for minimum angle of servo
+SERVO_MAX_DUTY = 12.5 + OFFSE_DUTY     #define pulse duty cycle for maximum angle of servo
 MAX_DISTANCE = 200   # define the maximum measuring distance, unit: cm
 timeOut = MAX_DISTANCE*60   # calculate timeout according to the maximum measuring distance
+
+def map( value, fromLow, fromHigh, toLow, toHigh): # map a value from one range to another range
+    
+    return (toHigh-toLow)*(value-fromLow) / (fromHigh-fromLow) + toLow # Set initial Duty Cycle to 0
+
+def servoWrite(angle): # make the servo rotate to specific angle, 0-180
+    if(angle<0):
+        angle = 0
+    elif(angle > 180):
+        angle = 180
+    p.ChangeDutyCycle(map(angle,0,180,SERVO_MIN_DUTY,SERVO_MAX_DUTY)) # map the angle to duty cycle and output it
 
 def pulseIn(pin,level,timeOut): # obtain pulse time of a pin under timeOut
     t0 = time.time()
@@ -35,34 +49,39 @@ def getSonar():     # get the measurement results of ultrasonic module,with unit
     return distance
 
 def setup():
+    global p
     GPIO.setmode(GPIO.BOARD)      # use PHYSICAL GPIO Numbering
     GPIO.setup(trigPin, GPIO.OUT)   # set trigPin to OUTPUT mode
     GPIO.setup(echoPin, GPIO.IN)    # set echoPin to INPUT mode
-    GPIO.setup(ledpin, GPIO.OUT) # set the ledPin to OUTPUT mode
-    GPIO.output(ledpin, GPIO.LOW) 
+    GPIO.setup(servoPin, GPIO.OUT) # set the ledPin to OUTPUT mode
+    GPIO.output(servoPin, GPIO.LOW)
+
+    p = GPIO.PWM(servoPin, 50) # set Frequece to 50Hz
+    p.start(0)
+
 
 def loop():
+    print(f'Starting loop ...')
     womp = 0
     while(True):
-
         distance = getSonar() # get distances
-        if 5 < distance < 10:
+        if 3 < distance < 10:
             print (f"The distance is : {distance:.2f} cm. Womp is {womp}")
             womp = womp + 1
         else :
             womp = 0
         time.sleep(.1)
 
-        if womp == 10:
-            GPIO.output(ledpin, GPIO.HIGH)
-            print("womp womp")
-            time.sleep(.1)
-            GPIO.output(ledpin, GPIO.LOW)
-            womp = 0
-
-
-
-
+        if womp == 7:
+           for dc in range(0, 181, 1): # make servo rotate from 0 to 180 deg
+               servoWrite(dc) # Write dc value to servo
+               time.sleep(0.001)
+           time.sleep(0.2)
+           for dc in range(180, -1, -1): # make servo rotate from 180 to 0 deg
+                servoWrite(dc)
+                time.sleep(0.001)
+           time.sleep(0.2)
+           womp = 0
 
 
 if __name__ == '__main__':     # Program entrance
